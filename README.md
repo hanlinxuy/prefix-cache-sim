@@ -5,7 +5,29 @@ SGLang-style Radix Tree Prefix Cache for analyzing token-level cache hit/miss pa
 ## Quick Start
 
 ```bash
-python3 prefix_cache_sim.py
+python -m prefix_cache_sim
+```
+
+## Installation
+
+```bash
+uv sync
+```
+
+## Project Structure
+
+```
+prefix_cache_sim/
+├── src/prefix_cache_sim/
+│   ├── __init__.py        # Package exports
+│   ├── __main__.py        # CLI entry point
+│   ├── radix_tree.py      # RadixNode & RadixPrefixCache
+│   ├── tokenizer.py       # Qwen2Tokenizer wrapper
+│   ├── data_loader.py     # Dataset loading
+│   ├── utils.py           # Utilities
+│   └── simulation.py      # Core simulation logic
+├── pyproject.toml
+└── README.md
 ```
 
 ## Output
@@ -23,12 +45,14 @@ The simulation outputs per-session statistics:
 
 ## Configuration
 
-Edit these variables in `main()`:
+Edit these variables in `src/prefix_cache_sim/__main__.py`:
 
 ```python
-NUM_SESSIONS = 100        # Total sessions to simulate
-MESSAGES_PER_SESSION = 5  # Messages per session
-CACHE_WARMUP = 10        # Sessions to preload into cache
+NUM_SESSIONS = None           # Total sessions (None = all)
+CACHE_WARMUP = 10            # Sessions to preload into cache
+CACHE_MAX_SIZE = 100000      # Max cache size in tokens
+EVICTION_POLICY = "lru"      # "lru" or "fifo"
+MODEL_NAME = "Qwen/Qwen2-0.5B"
 ```
 
 ## Use with Real Data
@@ -44,7 +68,15 @@ sessions: List[List[Dict[str, str]]]
 
 Output saved to `prefix_cache_results.json`.
 
+## Testing
+
+```bash
+uv run ruff check src/prefix_cache_sim/
+```
+
+All checks pass.
+
 ## Requirements
 
 - Python 3.9+
-- (Optional) transformers for real tokenizer
+- uv (package manager)

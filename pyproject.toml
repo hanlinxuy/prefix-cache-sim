@@ -1,0 +1,37 @@
+[project]
+name = "prefix-cache-sim"
+version = "0.1.0"
+description = "SGLang-style Radix Tree Prefix Cache Simulation"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "transformers>=4.30.0",
+    "datasets>=2.0.0",
+    "jinja2>=3.0.0",
+    "tqdm>=4.60.0",
+    "huggingface-hub>=0.16.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/prefix_cache_sim"]
+
+[dependency-groups]
+dev = []
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+ignore = ["E501", "N806"]
