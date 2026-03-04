@@ -57,6 +57,9 @@ def main():
     print(f"Max cache size: {stats['max_size']}")
     print(f"Eviction count: {stats['eviction_count']}")
     print(f"Eviction policy: {stats['eviction_policy']}")
+    print(f"Total tokens written: {stats['total_tokens_written']}")
+    print(f"Total tokens evicted: {stats['total_tokens_evicted']}")
+    print(f"Total write volume: {stats['total_write_volume']}")
 
     hit_rates = [r["prefix_hit_len"] / r["total"] * 100 for r in results if r["total"] > 0]
     if hit_rates:

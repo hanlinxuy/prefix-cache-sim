@@ -25,6 +25,9 @@ class RadixPrefixCache:
         self.max_size = max_size
         self.eviction_policy = eviction_policy
         self.eviction_count = 0
+        self.total_tokens_written = 0  # Total tokens written to cache (new nodes)
+        self.total_tokens_evicted = 0  # Total tokens evicted from cache
+        self.total_write_volume = 0  # Total write volume (tokens written + evicted)
         self.longest_prefix_hits = 0
         self.exact_hits = 0
         self.misses = 0
@@ -73,6 +76,8 @@ class RadixPrefixCache:
         self.current_size -= removed_size
         self.total_nodes -= 1
         self.eviction_count += 1
+        self.total_tokens_evicted += removed_size
+        self.total_write_volume += removed_size
 
     def _evict_fifo(self) -> None:
         if self.max_size is None:
@@ -112,6 +117,8 @@ class RadixPrefixCache:
         self.current_size -= removed_size
         self.total_nodes -= 1
         self.eviction_count += 1
+        self.total_tokens_evicted += removed_size
+        self.total_write_volume += removed_size
 
     def evict(self) -> None:
         if self.eviction_policy == "lru":
@@ -139,18 +146,24 @@ class RadixPrefixCache:
 
         current = self.root
 
+        new_nodes_created = 0
         for token_id in token_ids:
             if token_id not in current.children:
                 new_node = RadixNode(token_id=token_id)
                 current.children[token_id] = new_node
                 self.total_nodes += 1
                 self.current_size += 1
+                new_nodes_created += 1
             else:
                 current.children[token_id].ref_count += 1
 
             current = current.children[token_id]
 
         current.is_end = True
+
+        if new_nodes_created > 0:
+            self.total_tokens_written += new_nodes_created
+            self.total_write_volume += new_nodes_created
 
     def find_longest_prefix(self, token_ids: List[int]) -> Tuple[int, Optional[RadixNode]]:
         if not token_ids:
@@ -226,6 +239,9 @@ class RadixPrefixCache:
             "max_size": self.max_size,
             "eviction_count": self.eviction_count,
             "eviction_policy": self.eviction_policy,
+            "total_tokens_written": self.total_tokens_written,
+            "total_tokens_evicted": self.total_tokens_evicted,
+            "total_write_volume": self.total_write_volume,
         }
 
     def reset(self):
@@ -233,6 +249,9 @@ class RadixPrefixCache:
         self.total_nodes = 0
         self.current_size = 0
         self.eviction_count = 0
+        self.total_tokens_written = 0
+        self.total_tokens_evicted = 0
+        self.total_write_volume = 0
         self.longest_prefix_hits = 0
         self.exact_hits = 0
         self.misses = 0
