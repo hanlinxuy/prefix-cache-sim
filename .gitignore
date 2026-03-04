@@ -35,6 +35,9 @@ ENV/
 # Ruff
 .ruff_cache/
 
+# uv
+uv.lock
+
 # Results (generated)
 prefix_cache_results.json
 
