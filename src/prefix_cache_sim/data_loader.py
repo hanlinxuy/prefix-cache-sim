@@ -69,6 +69,8 @@ def load_chatml_jsonl(
                     messages = session
                 elif isinstance(session, dict):
                     messages = session.get("messages", [])
+                    if not messages:
+                        messages = session.get("conversations", [])
                 else:
                     continue
 
