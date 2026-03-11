@@ -1,90 +1,130 @@
-import json
+"""Minimal CLI for prefix cache simulation."""
 
-from prefix_cache_sim import (
-    Qwen2Tokenizer,
-    load_locomo_dataset,
-    simulate_radix_cache,
-)
+import argparse
+import json
+from typing import Any, Dict, List
+
+from prefix_cache_sim import Qwen2Tokenizer, chatml_messages_to_prompt
+from prefix_cache_sim.radix_tree import RadixPrefixCache
+
+
+def simulate_single_session_incremental(
+    session: List[Dict[str, Any]],
+    tokenizer: Qwen2Tokenizer,
+    cache: RadixPrefixCache,
+) -> List[Dict[str, Any]]:
+    """Simulate incremental requests for a single session.
+
+    Request 1: [msg1]
+    Request 2: [msg1, msg2]
+    Request 3: [msg1, msg2, msg3]
+    ...
+    """
+    results = []
+
+    for i in range(1, len(session) + 1):
+        messages = session[:i]
+        tokens = chatml_messages_to_prompt(messages, tokenizer)
+        result = cache.query(tokens)
+
+        results.append(
+            {
+                "request_id": i,
+                "num_messages": len(messages),
+                "total_tokens": len(tokens),
+                "hit_tokens": result["prefix_hit_len"],
+                "miss_tokens": result["miss_len"],
+                "exact_hit": result["exact_hit"],
+            }
+        )
+
+        # Add to cache for next request
+        cache.add(tokens)
+
+    return results
 
 
 def main():
-    print("=" * 60)
-    print("SGLang-style Radix Tree Prefix Cache Simulation")
-    print("=" * 60)
-    print()
-
-    NUM_SESSIONS = None
-    CACHE_WARMUP = 10
-    CACHE_MAX_SIZE = 100000
-    EVICTION_POLICY = "lru"
-    MODEL_NAME = "Qwen/Qwen2-0.5B"
-    DATASET_NAME = "Percena/locomo-mc10"
-
-    print(f"Loading Qwen2 tokenizer: {MODEL_NAME}")
-    tokenizer = Qwen2Tokenizer(model_name=MODEL_NAME)
-    print(f"Tokenizer loaded. BOS: {tokenizer.bos_token_id}, EOS: {tokenizer.eos_token_id}\n")
-
-    print(f"Loading dataset: {DATASET_NAME}")
-    sessions = load_locomo_dataset(max_sessions=NUM_SESSIONS)
-    print(f"Loaded {len(sessions)} sessions\n")
-
-    print("Sample session (first one):")
-    print(json.dumps(sessions[0], indent=2)[:500])
-    print("\n" + "=" * 60 + "\n")
-
-    results, cache = simulate_radix_cache(
-        sessions=sessions,
-        tokenizer=tokenizer,
-        cache_warmup_sessions=CACHE_WARMUP,
-        cache_max_size=CACHE_MAX_SIZE,
-        eviction_policy=EVICTION_POLICY,
+    parser = argparse.ArgumentParser(description="Radix Tree Prefix Cache Simulation")
+    parser.add_argument(
+        "--cache-max-size",
+        type=int,
+        default=None,
+        help="Maximum cache size in tokens (default: unlimited)",
+    )
+    parser.add_argument(
+        "--eviction-policy",
+        type=str,
+        default="lru",
+        choices=["lru", "fifo"],
+        help="Cache eviction policy (default: lru)",
+    )
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        default="Qwen/Qwen2-0.5B",
+        help="Tokenizer model name (default: Qwen/Qwen2-0.5B)",
     )
 
+    args = parser.parse_args()
+
+    print("=" * 60)
+    print("Radix Tree Prefix Cache - Single Session Test")
+    print("=" * 60)
+
+    # Simple test session
+    session = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "Hello"},
+        {"role": "assistant", "content": "Hi there!"},
+        {"role": "user", "content": "How are you?"},
+        {"role": "assistant", "content": "I'm doing well!"},
+    ]
+
+    print(f"\nSession: {len(session)} messages")
+    for i, msg in enumerate(session):
+        print(f"  [{i}] {msg['role']:10s}: {msg['content']}")
+
+    print(f"\nLoading tokenizer: {args.model_name}")
+    tokenizer = Qwen2Tokenizer(model_name=args.model_name)
+    print(f"BOS: {tokenizer.bos_token_id}, EOS: {tokenizer.eos_token_id}")
+
+    cache = RadixPrefixCache(
+        bos_token_id=tokenizer.bos_token_id,
+        max_size=args.cache_max_size,
+        eviction_policy=args.eviction_policy,
+    )
+
+    print(f"\nCache: max_size={args.cache_max_size}, policy={args.eviction_policy}")
+    print("\n" + "-" * 60)
+    print("Incremental Requests (Request N = Messages[0:N])")
+    print("-" * 60)
+
+    results = simulate_single_session_incremental(session, tokenizer, cache)
+
+    for r in results:
+        print(
+            f"\nRequest {r['request_id']} ({r['num_messages']} msgs, {r['total_tokens']} tokens):"
+        )
+        print(f"  Hit:   {r['hit_tokens']:3d} tokens")
+        print(f"  Miss:  {r['miss_tokens']:3d} tokens")
+        print(f"  Exact: {r['exact_hit']}")
+
     print("\n" + "=" * 60)
-    print("OVERALL STATISTICS")
+    print("Summary")
     print("=" * 60)
 
     stats = cache.get_statistics()
-    print(f"Total sequences processed: {stats['total_sequences']}")
-    print(f"Exact hits: {stats['exact_hits']}")
-    print(f"Misses: {stats['misses']}")
-    print(f"Exact hit rate: {stats['exact_hit_rate']}")
-    print(f"Token-level hit rate: {stats['token_hit_rate']}")
+    print(f"Total requests: {len(results)}")
     print(f"Total tokens processed: {stats['total_tokens_processed']}")
     print(f"Prefix hit tokens: {stats['prefix_hits_tokens']}")
-    print(f"Cache tree nodes: {stats['cache_nodes']}")
-    print(f"Current cache size: {stats['current_size']}")
-    print(f"Max cache size: {stats['max_size']}")
-    print(f"Eviction count: {stats['eviction_count']}")
-    print(f"Eviction policy: {stats['eviction_policy']}")
-    print(f"Total tokens written: {stats['total_tokens_written']}")
-    print(f"Total tokens evicted: {stats['total_tokens_evicted']}")
-    print(f"Total write volume: {stats['total_write_volume']}")
+    print(f"Cache nodes created: {stats['cache_nodes']}")
+    print(f"Cache size: {stats['current_size']}")
 
-    hit_rates = [r["prefix_hit_len"] / r["total"] * 100 for r in results if r["total"] > 0]
-    if hit_rates:
-        print(f"\nAverage prefix hit rate: {sum(hit_rates) / len(hit_rates):.2f}%")
-        print(f"Min prefix hit rate: {min(hit_rates):.2f}%")
-        print(f"Max prefix hit rate: {max(hit_rates):.2f}%")
+    if stats["max_size"]:
+        print(f"Cache utilization: {stats['current_size'] / stats['max_size'] * 100:.1f}%")
 
-    output = {
-        "config": {
-            "num_sessions": NUM_SESSIONS,
-            "cache_warmup_sessions": CACHE_WARMUP,
-            "cache_type": "radix_tree",
-            "cache_max_size": CACHE_MAX_SIZE,
-            "eviction_policy": EVICTION_POLICY,
-            "tokenizer_model": MODEL_NAME,
-            "dataset": DATASET_NAME,
-        },
-        "overall_stats": stats,
-        "per_session_results": results,
-    }
-
-    with open("prefix_cache_results.json", "w") as f:
-        json.dump(output, f, indent=2)
-
-    print("\nResults saved to prefix_cache_results.json")
+    print(f"Token-level hit rate: {stats['token_hit_rate']}")
 
 
 if __name__ == "__main__":

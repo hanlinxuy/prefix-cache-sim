@@ -2,231 +2,149 @@
 
 ## Project Overview
 
-Python package implementing SGLang-style Radix Tree prefix cache simulation for LLM inference optimization. Analyzes token-level cache hit/miss patterns in ChatML-formatted conversations with tool call support.
+SGLang-style Radix Tree Prefix Cache simulation for LLM inference. Simulates token-level cache hit/miss patterns in ChatML conversations.
 
 ## Build, Lint, Test Commands
 
-### Running the Simulation
-
 ```bash
-# Run the prefix cache simulation
-python -m prefix_cache_sim
+# Run simulation
+PYTHONPATH=src uv run python -m prefix_cache_sim
 
-# Or using uv
-uv run python -m prefix_cache_sim
-```
-
-### Installation
-
-```bash
-# Install dependencies with uv
+# Install dependencies
 uv sync
 
-# Install dev dependencies
-uv sync --group dev
-```
-
-### Linting
-
-```bash
-# Lint all Python files
+# Lint
 uv run ruff check .
-
-# Lint specific directory
-uv run ruff check src/prefix_cache_sim/
-
-# Auto-fix linting issues
 uv run ruff check --fix .
-```
 
-### Type Checking
-
-```bash
-# Type check the project
+# Type check
 uv run mypy src/prefix_cache_sim/
 
-# Type check specific file
-uv run mypy src/prefix_cache_sim/radix_tree.py
+# Run tests
+uv run pytest tests/ -v
+uv run pytest tests/test_cache_property.py -v
+uv run pytest tests/test_cache_property.py::test_miss_equals_user_tokens -v
 ```
 
-### Testing
-
-```bash
-# Run all tests
-uv run pytest
-
-# Run specific test file
-uv run pytest tests/test_integration.py -v
-
-# Run specific test function
-uv run pytest tests/test_integration.py::test_full_pipeline_with_tools -v
-
-# Run with coverage
-uv run pytest --cov=prefix_cache_sim tests/
-```
-
-## Code Style Guidelines
+## Code Style
 
 ### Imports
 
-Order imports by type with blank lines between groups:
-
 ```python
 # Standard library
-import json
 import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
 
 # Third party
-from tqdm import tqdm
 from transformers import AutoTokenizer
 
-# Local application
+# Local
 from prefix_cache_sim.radix_tree import RadixNode
 from prefix_cache_sim.utils import chatml_messages_to_prompt
 ```
 
-### Naming Conventions
+### Naming
 
 ```python
-# Modules: snake_case
-prefix_cache_sim/
+# snake_case: modules, functions, variables
 radix_tree.py
-simulation.py
-
-# Classes: PascalCase
-class RadixNode:
-class RadixPrefixCache:
-class Qwen2Tokenizer:
-
-# Functions/variables: snake_case
-def simulate_radix_cache():
 def find_longest_prefix():
 token_ids = []
-bos_token_id = 1
 
-# Constants: UPPER_SNAKE_CASE
-DEFAULT_WARMUP_SESSIONS = 10
-MAX_TOKEN_LENGTH = 4096
+# PascalCase: classes
+class RadixPrefixCache:
+class RadixNode:
+
+# UPPER_SNAKE_CASE: constants
+DEFAULT_MAX_SIZE = 10000
 ```
 
-### Type Checking and Annotations
+### Types
 
 ```python
-from typing import Any, Dict, List, Optional, Tuple
-from dataclasses import dataclass, field
-
 @dataclass
 class RadixNode:
-    token_id: int
+    tokens: List[int] = field(default_factory=list)
     children: Dict[int, "RadixNode"] = field(default_factory=dict)
-    is_end: bool = False
-    ref_count: int = 1
 
-def simulate_radix_cache(
+def process(
     sessions: List[List[Dict[str, str]]],
     tokenizer: Qwen2Tokenizer,
-    cache_warmup_sessions: int = 10,
-) -> Tuple[List[Dict[str, Any]], RadixPrefixCache]:
+) -> Tuple[int, RadixPrefixCache]:
+    """Process sessions and return hit count."""
     ...
 ```
 
 ### Error Handling
 
 ```python
-# Use early returns for validation
-def add(self, token_ids: List[int]) -> None:
-    if not token_ids:
-        return
-    
-    if self.max_size and tokens_to_add > self.max_size:
-        return
+# Early returns for validation
+if not token_ids:
+    return
 
-# Avoid empty except blocks
+# Explicit exceptions
 try:
     result = process(data)
 except ValueError as e:
-    raise ValueError(f"Failed to process: {e}") from e
+    raise ValueError(f"Failed: {e}") from e
 ```
 
-### Function Design
-
-- Keep functions focused and small (< 50 lines when possible)
-- Use clear parameter names
-- Add type hints for all public functions
-- Prefer explicit returns over implicit None
-- Use progress bars for long-running operations (tqdm)
-
-### File Organization
+## File Structure
 
 ```
-prefix-cache-sim/
-├── src/prefix_cache_sim/
-│   ├── __init__.py        # Package exports
-│   ├── __main__.py        # CLI entry point
-│   ├── radix_tree.py      # RadixNode & RadixPrefixCache
-│   ├── tokenizer.py       # Qwen2Tokenizer wrapper
-│   ├── data_loader.py     # Dataset loading
-│   ├── tool_parser.py     # Tool call parsing
-│   ├── utils.py           # Utility functions
-│   └── simulation.py      # Core simulation logic
-├── tests/
-│   ├── test_integration.py
-│   └── fixtures/
-├── pyproject.toml
-└── AGENTS.md
+src/prefix_cache_sim/
+├── __init__.py       # Exports
+├── __main__.py       # CLI
+├── radix_tree.py     # RadixPrefixCache, RadixNode
+├── tokenizer.py      # Qwen2Tokenizer
+└── utils.py          # chatml_messages_to_prompt
+
+tests/
+└── test_cache_property.py
+
+data/
+└── open_wiki_traj_test_5.jsonl
 ```
 
-### Documentation
+## Testing
 
-- Use docstrings for module-level and class-level documentation
-- Keep docstrings concise - describe what/why, not how
-- Example format:
+Test file: `test_*.py`
+Function: `test_*`
 
 ```python
-def simulate_radix_cache(
-    sessions: List[List[Dict[str, str]]],
-    tokenizer: Qwen2Tokenizer,
-    cache_warmup_sessions: int = 10,
-) -> Tuple[List[Dict[str, Any]], RadixPrefixCache]:
-    """Simulate radix tree prefix cache on chat sessions."""
-    ...
+def test_miss_equals_user_tokens():
+    """Verify cache miss equals current user message tokens."""
+    cache = RadixPrefixCache()
+    # ... test logic
+    assert miss_tokens == expected_miss
 ```
 
-### Testing Guidelines
+## Key Implementation Details
 
-Test file naming: `test_*.py`
-Test function naming: `test_*`
+1. **Radix Tree**: Edge-compressed (stores token sequences), not one-token-per-node
+2. **Cache Flow**: Query(history) → Generate → Cache.add(full_conversation)
+3. **Property**: Miss tokens == current user message tokens (history is cached)
+4. **Eviction**: LRU based on access counter (not timestamps)
 
-```python
-def test_full_pipeline_with_tools():
-    sessions = load_chatml_jsonl("tests/fixtures/dummy_chatml.jsonl")
-    assert len(sessions) == 5
-    ...
-```
-
-### Git Workflow
+## Git Workflow
 
 ```bash
-# Branch naming
-feature/radix-cache-optimization
-bugfix/fix-cache-miss-handling
+# Branches
+feature/radix-optimization
+fix/cache-miss-calculation
 
-# Commit message format
-<type>: <description>
-
-# Types: feat, fix, docs, style, refactor, test, chore
-feat(cache): add LRU eviction policy
-fix(tree): resolve prefix match boundary case
+# Commits
+feat(cache): add LRU eviction
+fix(tree): correct partial match handling
+test: add cache property verification
 ```
 
-### General Principles
+## Principles
 
-1. **Single responsibility**: Each function does one thing well
-2. **Explicit over implicit**: Clear naming and types
-3. **Immutability**: Prefer immutable data where practical
-4. **Fail fast**: Validate inputs early
-5. **No AI slop**: Write code that a senior engineer would write - no placeholder comments, no "TODO" without explanation
-6. **Use uv**: Package manager for dependency management
-7. **Progress feedback**: Use tqdm for long-running operations
+1. Single responsibility functions (< 50 lines)
+2. Explicit types for all public functions
+3. Fail fast with early validation
+4. No placeholder comments or TODOs without context
+5. Use `uv` for package management
+6. Write code a senior engineer would write

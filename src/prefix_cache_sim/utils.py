@@ -1,99 +1,19 @@
-import random
+"""Minimal utilities for prefix cache simulation."""
+
 from typing import Any, Dict, List
 
 from prefix_cache_sim.tokenizer import Qwen2Tokenizer
-from prefix_cache_sim.tool_parser import convert_chatml_with_tools
 
 
 def chatml_messages_to_prompt(
     messages: List[Dict[str, Any]], tokenizer: Qwen2Tokenizer
 ) -> List[int]:
-    converted_messages = convert_chatml_with_tools(messages)
-
-    tokens = []
-    for msg in converted_messages:
-        role = msg.get("role", "user")
-        content = msg.get("content", "")
-        msg_tokens = tokenizer.encode_chatml_message(role, content)
-        tokens.extend(msg_tokens)
-    return tokens
-
-
-def generate_fake_chatml_data(
-    num_sessions: int = 100, messages_per_session: int = 5
-) -> List[List[Dict[str, str]]]:
-    system_prompts = [
-        "You are a helpful assistant.",
-        "You are a coding assistant.",
-        "You are a friendly chatbot.",
-    ]
-
-    user_messages = [
-        "Hello how are you",
-        "What is Python",
-        "Explain machine learning",
-        "Write a function to add numbers",
-        "What is the weather today",
-        "Tell me a joke",
-        "How do I learn programming",
-        "What is AI",
-        "Can you help me with math",
-        "What are your capabilities",
-    ]
-
-    assistant_messages = [
-        "I am doing well thank you",
-        "Python is a high level programming language",
-        "Machine learning is a subset of AI that enables systems to learn from data",
-        "Here is a function: def add a b return a plus b",
-        "I am sorry I do not have access to weather data",
-        "Why did the developer go broke because he used up all his cache",
-        "Start with basics and practice daily",
-        "Artificial Intelligence is the simulation of human intelligence by machines",
-        "I can help with various math problems",
-        "I can answer questions write code and assist with many tasks",
-    ]
-
-    sessions = []
-
-    base_system = system_prompts[0]
-
-    session_variations = []
-    for i in range(50):
-        session_variations.append(
-            {
-                "system": system_prompts[i % len(system_prompts)],
-                "user": user_messages[i % len(user_messages)],
-                "assistant": assistant_messages[i % len(assistant_messages)],
-            }
-        )
-
-    for session_idx in range(num_sessions):
-        session = []
-
-        session.append(
-            {
-                "role": "system",
-                "content": base_system,
-            }
-        )
-
-        for msg_idx in range(random.randint(2, messages_per_session)):
-            variation = session_variations[(session_idx + msg_idx) % len(session_variations)]
-
-            session.append(
-                {
-                    "role": "user",
-                    "content": variation["user"],
-                }
-            )
-            session.append(
-                {
-                    "role": "assistant",
-                    "content": variation["assistant"],
-                }
-            )
-
-        sessions.append(session)
-
-    return sessions
+    """Convert ChatML messages to token IDs using the tokenizer's chat template."""
+    # Use the tokenizer's apply_chat_template for proper formatting
+    result = tokenizer.tokenizer.apply_chat_template(
+        messages, tokenize=True, add_generation_prompt=False
+    )
+    # Handle different return types
+    if hasattr(result, "get"):
+        return result.get("input_ids", result)
+    return result
