@@ -1,5 +1,8 @@
+import sys
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional, Tuple
+
+sys.setrecursionlimit(10000)
 
 
 @dataclass
@@ -44,12 +47,14 @@ class RadixPrefixCache:
 
         candidates = []
 
-        def find_leaf_nodes(node: RadixNode, path: List[int]) -> None:
+        def find_leaf_nodes(node: RadixNode, path: List[int], depth: int = 0) -> None:
+            if depth > 1000:
+                return
             if not node.children:
                 candidates.append((path.copy(), node.ref_count, node.size))
             else:
                 for child_token, child_node in node.children.items():
-                    find_leaf_nodes(child_node, path + [child_token])
+                    find_leaf_nodes(child_node, path + [child_token], depth + 1)
 
         find_leaf_nodes(self.root, [])
 
@@ -85,12 +90,14 @@ class RadixPrefixCache:
 
         candidates = []
 
-        def find_leaf_nodes(node: RadixNode, path: List[int]) -> None:
+        def find_leaf_nodes(node: RadixNode, path: List[int], depth: int = 0) -> None:
+            if depth > 1000:
+                return
             if not node.children:
                 candidates.append((path.copy(), node.ref_count, node.size))
             else:
                 for child_token, child_node in node.children.items():
-                    find_leaf_nodes(child_node, path + [child_token])
+                    find_leaf_nodes(child_node, path + [child_token], depth + 1)
 
         find_leaf_nodes(self.root, [])
 

@@ -1,14 +1,17 @@
 import random
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from prefix_cache_sim.tokenizer import Qwen2Tokenizer
+from prefix_cache_sim.tool_parser import convert_chatml_with_tools
 
 
 def chatml_messages_to_prompt(
-    messages: List[Dict[str, str]], tokenizer: Qwen2Tokenizer
+    messages: List[Dict[str, Any]], tokenizer: Qwen2Tokenizer
 ) -> List[int]:
+    converted_messages = convert_chatml_with_tools(messages)
+
     tokens = []
-    for msg in messages:
+    for msg in converted_messages:
         role = msg.get("role", "user")
         content = msg.get("content", "")
         msg_tokens = tokenizer.encode_chatml_message(role, content)

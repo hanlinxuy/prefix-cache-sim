@@ -1,14 +1,15 @@
 import os
-from typing import List
+from typing import List, Union
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
 try:
-    from transformers import AutoTokenizer
+    from transformers import AutoTokenizer, BatchEncoding
 
     HAS_TRANSFORMERS = True
 except ImportError:
     HAS_TRANSFORMERS = False
+    BatchEncoding = None
 
 
 class Qwen2Tokenizer:
@@ -24,4 +25,11 @@ class Qwen2Tokenizer:
 
     def encode_chatml_message(self, role: str, content: str) -> List[int]:
         messages = [{"role": role, "content": content}]
-        return self.tokenizer.apply_chat_template(messages, tokenize=True)
+        result = self.tokenizer.apply_chat_template(
+            messages, tokenize=True, add_generation_prompt=False
+        )
+        if isinstance(result, BatchEncoding):
+            return result.get("input_ids", [])
+        elif isinstance(result, dict):
+            return result.get("input_ids", [])
+        return result

@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 os.environ["HF_ENDPOINT"] = "https://hf-mirror.com"
 
@@ -48,5 +48,37 @@ def load_locomo_dataset(
 
             if session:
                 sessions.append(session)
+
+    return sessions
+
+
+def load_chatml_jsonl(
+    file_path: str, max_sessions: Optional[int] = None
+) -> List[List[Dict[str, Any]]]:
+    sessions = []
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        for line in f:
+            if not line.strip():
+                continue
+
+            try:
+                session = json.loads(line)
+
+                if isinstance(session, list):
+                    messages = session
+                elif isinstance(session, dict):
+                    messages = session.get("messages", [])
+                else:
+                    continue
+
+                if messages:
+                    sessions.append(messages)
+
+                if max_sessions and len(sessions) >= max_sessions:
+                    break
+
+            except json.JSONDecodeError:
+                continue
 
     return sessions
