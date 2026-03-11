@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-This is a Python project containing a prefix cache simulation for LLM inference optimization. It implements a SGLang-style Radix Tree to analyze token-level cache hit/miss patterns in ChatML-formatted conversations.
+Python package implementing SGLang-style Radix Tree prefix cache simulation for LLM inference optimization. Analyzes token-level cache hit/miss patterns in ChatML-formatted conversations with tool call support.
 
 ## Build, Lint, Test Commands
 
@@ -10,69 +10,99 @@ This is a Python project containing a prefix cache simulation for LLM inference 
 
 ```bash
 # Run the prefix cache simulation
-python3 prefix_cache_sim.py
+python -m prefix_cache_sim
 
-# Run with specific parameters (edit the NUM_SESSIONS, CACHE_WARMUP variables in main())
-python3 prefix_cache_sim.py
+# Or using uv
+uv run python -m prefix_cache_sim
+```
+
+### Installation
+
+```bash
+# Install dependencies with uv
+uv sync
+
+# Install dev dependencies
+uv sync --group dev
 ```
 
 ### Linting
 
 ```bash
-# Install ruff if needed
-pip install ruff
-
 # Lint all Python files
-ruff check .
+uv run ruff check .
+
+# Lint specific directory
+uv run ruff check src/prefix_cache_sim/
 
 # Auto-fix linting issues
-ruff check --fix .
+uv run ruff check --fix .
 ```
 
 ### Type Checking
 
 ```bash
-# Install mypy if needed
-pip install mypy
-
 # Type check the project
-mypy prefix_cache_sim.py
+uv run mypy src/prefix_cache_sim/
+
+# Type check specific file
+uv run mypy src/prefix_cache_sim/radix_tree.py
+```
+
+### Testing
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run specific test file
+uv run pytest tests/test_integration.py -v
+
+# Run specific test function
+uv run pytest tests/test_integration.py::test_full_pipeline_with_tools -v
+
+# Run with coverage
+uv run pytest --cov=prefix_cache_sim tests/
 ```
 
 ## Code Style Guidelines
 
 ### Imports
 
-Order imports by type:
+Order imports by type with blank lines between groups:
 
 ```python
 # Standard library
 import json
-import random
-from typing import List, Dict, Any, Tuple, Optional
+import sys
 from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
 
-# Third party (if any)
-# from transformers import AutoTokenizer
+# Third party
+from tqdm import tqdm
+from transformers import AutoTokenizer
 
 # Local application
-# from mymodule import MyClass
+from prefix_cache_sim.radix_tree import RadixNode
+from prefix_cache_sim.utils import chatml_messages_to_prompt
 ```
 
 ### Naming Conventions
 
 ```python
 # Modules: snake_case
-prefix_cache_sim.py
+prefix_cache_sim/
 radix_tree.py
+simulation.py
 
 # Classes: PascalCase
 class RadixNode:
 class RadixPrefixCache:
+class Qwen2Tokenizer:
 
 # Functions/variables: snake_case
-def chatml_messages_to_prompt():
 def simulate_radix_cache():
+def find_longest_prefix():
 token_ids = []
 bos_token_id = 1
 
@@ -81,10 +111,10 @@ DEFAULT_WARMUP_SESSIONS = 10
 MAX_TOKEN_LENGTH = 4096
 ```
 
-### Type Annotations
+### Type Checking and Annotations
 
 ```python
-from typing import List, Dict, Any, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 
 @dataclass
@@ -94,9 +124,11 @@ class RadixNode:
     is_end: bool = False
     ref_count: int = 1
 
-def find_longest_prefix(
-    self, token_ids: List[int]
-) -> Tuple[int, Optional[RadixNode]]:
+def simulate_radix_cache(
+    sessions: List[List[Dict[str, str]]],
+    tokenizer: Qwen2Tokenizer,
+    cache_warmup_sessions: int = 10,
+) -> Tuple[List[Dict[str, Any]], RadixPrefixCache]:
     ...
 ```
 
@@ -108,7 +140,8 @@ def add(self, token_ids: List[int]) -> None:
     if not token_ids:
         return
     
-    # Main logic...
+    if self.max_size and tokens_to_add > self.max_size:
+        return
 
 # Avoid empty except blocks
 try:
@@ -117,71 +150,63 @@ except ValueError as e:
     raise ValueError(f"Failed to process: {e}") from e
 ```
 
-### Dataclass Usage
-
-Use `@dataclass` for simple data containers:
-
-```python
-from dataclasses import dataclass, field
-from typing import Dict
-
-@dataclass
-class RadixNode:
-    token_id: int
-    children: Dict[int, "RadixNode"] = field(default_factory=dict)
-    is_end: bool = False
-```
-
 ### Function Design
 
 - Keep functions focused and small (< 50 lines when possible)
 - Use clear parameter names
 - Add type hints for all public functions
 - Prefer explicit returns over implicit None
+- Use progress bars for long-running operations (tqdm)
 
 ### File Organization
 
 ```
-project/
-├── prefix_cache_sim.py    # Main entry point
-├── prefix_cache_results.json  # Output (generated)
-├── data/                  # Data directory
-│   └── (dataset files)
-├── tests/                 # Test files (if added)
-└── AGENTS.md             # This file
+prefix-cache-sim/
+├── src/prefix_cache_sim/
+│   ├── __init__.py        # Package exports
+│   ├── __main__.py        # CLI entry point
+│   ├── radix_tree.py      # RadixNode & RadixPrefixCache
+│   ├── tokenizer.py       # Qwen2Tokenizer wrapper
+│   ├── data_loader.py     # Dataset loading
+│   ├── tool_parser.py     # Tool call parsing
+│   ├── utils.py           # Utility functions
+│   └── simulation.py      # Core simulation logic
+├── tests/
+│   ├── test_integration.py
+│   └── fixtures/
+├── pyproject.toml
+└── AGENTS.md
 ```
 
 ### Documentation
 
 - Use docstrings for module-level and class-level documentation
 - Keep docstrings concise - describe what/why, not how
-- Example docstring format:
+- Example format:
 
 ```python
-def chatml_messages_to_prompt(
-    messages: List[Dict[str, str]], tokenizer: MockTokenizer
-) -> List[int]:
-    """Convert ChatML messages to token list."""
+def simulate_radix_cache(
+    sessions: List[List[Dict[str, str]]],
+    tokenizer: Qwen2Tokenizer,
+    cache_warmup_sessions: int = 10,
+) -> Tuple[List[Dict[str, Any]], RadixPrefixCache]:
+    """Simulate radix tree prefix cache on chat sessions."""
     ...
 ```
 
 ### Testing Guidelines
 
-When adding tests:
-
-```bash
-# Run a single test file
-python3 -m pytest tests/test_cache.py -v
-
-# Run a specific test
-python3 -m pytest tests/test_cache.py::test_radix_tree_insert -v
-```
-
 Test file naming: `test_*.py`
-Test class naming: `Test*`
 Test function naming: `test_*`
 
-### Git Workflow (if applicable)
+```python
+def test_full_pipeline_with_tools():
+    sessions = load_chatml_jsonl("tests/fixtures/dummy_chatml.jsonl")
+    assert len(sessions) == 5
+    ...
+```
+
+### Git Workflow
 
 ```bash
 # Branch naming
@@ -203,3 +228,5 @@ fix(tree): resolve prefix match boundary case
 3. **Immutability**: Prefer immutable data where practical
 4. **Fail fast**: Validate inputs early
 5. **No AI slop**: Write code that a senior engineer would write - no placeholder comments, no "TODO" without explanation
+6. **Use uv**: Package manager for dependency management
+7. **Progress feedback**: Use tqdm for long-running operations
