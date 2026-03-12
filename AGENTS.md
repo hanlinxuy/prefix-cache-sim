@@ -4,6 +4,24 @@
 
 SGLang-style Radix Tree Prefix Cache simulation for LLM inference. Simulates token-level cache hit/miss patterns in ChatML conversations.
 
+## Environment
+
+使用项目根目录的uv venv环境：
+
+```bash
+# 激活虚拟环境
+source .venv/bin/activate
+
+# 或使用 uv run 直接运行
+uv run python -m prefix_cache_sim
+```
+
+**注意**：如果运行时报错 `OMP: Error #15: Initializing libomp.dylib`，需要设置环境变量：
+
+```bash
+export KMP_DUPLICATE_LIB_OK=TRUE
+```
+
 ## Build, Lint, Test Commands
 
 ```bash
@@ -97,6 +115,7 @@ src/prefix_cache_sim/
 ├── __init__.py       # Exports
 ├── __main__.py       # CLI
 ├── radix_tree.py     # RadixPrefixCache, RadixNode
+├── simulator.py      # CacheSimulator, batch processing
 ├── tokenizer.py      # Qwen2Tokenizer
 └── utils.py          # chatml_messages_to_prompt
 

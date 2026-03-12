@@ -42,16 +42,21 @@ class RadixPrefixCache:
         self.eviction_policy = eviction_policy
 
         # Statistics
-        self.current_size = 0
+        self.current_size = 0  # 当前使用的cache size (tokens)
         self.total_nodes = 0
         self.eviction_count = 0
         self.total_tokens_written = 0
         self.total_tokens_evicted = 0
         self.total_write_volume = 0
-        self.longest_prefix_hits = 0
+        self.longest_prefix_hits = 0  # 累计hit tokens
         self.exact_hits = 0
         self.misses = 0
         self.total_tokens_processed = 0
+
+        # Core metrics for prefill cost calculation
+        self.total_requests = 0  # 总请求数
+        self.total_miss_tokens = 0  # 累计miss tokens
+        self.total_hit_tokens = 0  # 累计hit tokens
 
         # Concurrent mode stats
         self.concurrent_mode = False
@@ -339,8 +344,14 @@ class RadixPrefixCache:
         Updates statistics but does NOT add to cache.
         """
         self.total_tokens_processed += len(token_ids)
+        self.total_requests += 1
 
         matched_len, end_node = self.find_longest_prefix(token_ids)
+        miss_len = len(token_ids) - matched_len
+
+        # Core metrics accumulation
+        self.total_hit_tokens += matched_len
+        self.total_miss_tokens += miss_len
 
         # Exact hit only if we matched all tokens AND ended at an end node
         # (not in the middle of an edge)
@@ -359,7 +370,7 @@ class RadixPrefixCache:
             return {
                 "exact_hit": False,
                 "prefix_hit_len": matched_len,
-                "miss_len": len(token_ids) - matched_len,
+                "miss_len": miss_len,
                 "total": len(token_ids),
             }
         else:
@@ -367,12 +378,12 @@ class RadixPrefixCache:
             return {
                 "exact_hit": False,
                 "prefix_hit_len": 0,
-                "miss_len": len(token_ids),
+                "miss_len": miss_len,
                 "total": len(token_ids),
             }
 
     def get_statistics(self) -> Dict[str, Any]:
-        """Get cache statistics."""
+        """Get cache statistics focused on prefill cost calculation."""
         total = self.exact_hits + self.misses
         exact_hit_rate = self.exact_hits / total if total > 0 else 0
 
@@ -382,26 +393,36 @@ class RadixPrefixCache:
             else 0
         )
 
+        # Core metrics for prefill cost
+        avg_hit_tokens = (
+            self.total_hit_tokens / self.total_requests if self.total_requests > 0 else 0
+        )
+        avg_miss_tokens = (
+            self.total_miss_tokens / self.total_requests if self.total_requests > 0 else 0
+        )
+
         return {
-            "total_sequences": total,
-            "exact_hits": self.exact_hits,
-            "misses": self.misses,
+            # Core prefill metrics
+            "total_requests": self.total_requests,
+            "avg_hit_tokens_per_request": round(avg_hit_tokens, 2),
+            "avg_miss_tokens_per_request": round(avg_miss_tokens, 2),
+            "total_hit_tokens": self.total_hit_tokens,
+            "total_miss_tokens": self.total_miss_tokens,
+            # Cache capacity metrics
+            "cache_max_size": self.max_size,
+            "cache_used_size": self.current_size,
+            "cache_utilization": (
+                f"{self.current_size / self.max_size * 100:.1f}%"
+                if self.max_size
+                else "N/A (unlimited)"
+            ),
+            # Hit rates
             "exact_hit_rate": f"{exact_hit_rate * 100:.2f}%",
             "token_hit_rate": f"{token_hit_rate * 100:.2f}%",
             "total_tokens_processed": self.total_tokens_processed,
-            "prefix_hits_tokens": self.longest_prefix_hits,
+            # Additional info
             "cache_nodes": self.total_nodes,
-            "current_size": self.current_size,
-            "max_size": self.max_size,
             "eviction_count": self.eviction_count,
-            "eviction_policy": self.eviction_policy,
-            "total_tokens_written": self.total_tokens_written,
-            "total_tokens_evicted": self.total_tokens_evicted,
-            "total_write_volume": self.total_write_volume,
-            "concurrent_mode": self.concurrent_mode,
-            "num_concurrent_sessions": self.num_concurrent_sessions,
-            "total_concurrent_requests": self.total_concurrent_requests,
-            "avg_miss_tokens_per_request": f"{self.avg_miss_tokens_per_request:.2f}",
         }
 
     def reset(self) -> None:
@@ -417,8 +438,9 @@ class RadixPrefixCache:
         self.exact_hits = 0
         self.misses = 0
         self.total_tokens_processed = 0
-        self.concurrent_mode = False
-        self.num_concurrent_sessions = 0
-        self.total_concurrent_requests = 0
-        self.avg_miss_tokens_per_request = 0.0
         self._access_counter = 0
+
+        # Core metrics
+        self.total_requests = 0
+        self.total_miss_tokens = 0
+        self.total_hit_tokens = 0
